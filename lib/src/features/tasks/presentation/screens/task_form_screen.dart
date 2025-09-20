@@ -18,16 +18,13 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _dueDateController = TextEditingController();
   final TextEditingController _reminderTimeController = TextEditingController();
-  DateTime? _dueDate = DateTime.now();
+  DateTime? _dueDate; // start null to enforce required selection
   TimeOfDay? _reminderTime;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    if (_dueDate != null) {
-      _dueDateController.text = _dueDate!.toLocal().toString().split(' ').first;
-    }
   }
 
   @override
@@ -192,7 +189,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               ),
               onTap: _pickDueDate,
               validator: (String? value) {
-                if (_dueDate == null) {
+                if (_dueDate == null ||
+                    _dueDateController.text.trim().isEmpty) {
                   return 'Please select a due date';
                 }
                 return null;
@@ -211,6 +209,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(56),
+              ),
               onPressed: _saving ? null : _save,
               icon: _saving
                   ? const SizedBox(
@@ -219,7 +220,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.save),
-              label: const Text('Save Task'),
+              label: const Text('Save task'),
             ),
           ],
         ),
