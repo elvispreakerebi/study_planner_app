@@ -10,6 +10,7 @@ import 'package:study_planner_app/src/features/tasks/data/repositories/task_repo
 import 'package:study_planner_app/src/features/tasks/domain/entities/task.dart';
 import 'package:study_planner_app/src/features/tasks/domain/repositories/task_repository.dart';
 import 'package:study_planner_app/src/features/tasks/presentation/screens/task_form_screen.dart';
+import 'package:study_planner_app/src/features/tasks/presentation/widgets/task_card.dart';
 
 void main() {
   runApp(const StudyPlannerApp());
@@ -269,24 +270,57 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
           : _tasks.isEmpty
           ? const Center(child: Text('No tasks for today yet'))
           : ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
               itemCount: _tasks.length,
               itemBuilder: (BuildContext context, int index) {
                 final Task task = _tasks[index];
-                return ListTile(
-                  leading: Icon(
-                    task.isCompleted
-                        ? Icons.check_circle
-                        : Icons.radio_button_unchecked,
-                  ),
-                  title: Text(task.title),
-                  subtitle:
-                      task.description != null && task.description!.isNotEmpty
-                      ? Text(task.description!)
-                      : null,
+                return TaskCard(
+                  task: task,
+                  onEdit: () async {
+                    // open edit mode later
+                    final Task? updated = await Navigator.of(context)
+                        .push<Task>(
+                          MaterialPageRoute<Task>(
+                            fullscreenDialog: true,
+                            builder: (BuildContext context) => TaskFormScreen(
+                              repository: widget.taskRepository,
+                            ),
+                          ),
+                        );
+                    if (updated != null) {
+                      await _load();
+                    }
+                  },
+                  onDelete: () async {
+                    final bool? confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (BuildContext context) => AlertDialog(
+                        title: const Text('Delete task?'),
+                        content: const Text('This action cannot be undone.'),
+                        actions: <Widget>[
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel'),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      await widget.taskRepository.delete(task.id);
+                      await _load();
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Task deleted')),
+                      );
+                    }
+                  },
                 );
               },
-              separatorBuilder: (_, __) => const Divider(height: 1),
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: _openCreateTask,
@@ -364,25 +398,63 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 : _tasks.isEmpty
                 ? const Center(child: Text('No tasks on this date'))
                 : ListView.separated(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 12,
+                    ),
                     itemCount: _tasks.length,
                     itemBuilder: (BuildContext context, int index) {
                       final Task task = _tasks[index];
-                      return ListTile(
-                        leading: Icon(
-                          task.isCompleted
-                              ? Icons.check_circle
-                              : Icons.radio_button_unchecked,
-                        ),
-                        title: Text(task.title),
-                        subtitle:
-                            task.description != null &&
-                                task.description!.isNotEmpty
-                            ? Text(task.description!)
-                            : null,
+                      return TaskCard(
+                        task: task,
+                        onEdit: () async {
+                          final Task? updated = await Navigator.of(context)
+                              .push<Task>(
+                                MaterialPageRoute<Task>(
+                                  fullscreenDialog: true,
+                                  builder: (BuildContext context) =>
+                                      TaskFormScreen(
+                                        repository: widget.repository,
+                                      ),
+                                ),
+                              );
+                          if (updated != null) {
+                            await _loadForDay(_selectedDay);
+                          }
+                        },
+                        onDelete: () async {
+                          final bool? confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (BuildContext context) => AlertDialog(
+                              title: const Text('Delete task?'),
+                              content: const Text(
+                                'This action cannot be undone.',
+                              ),
+                              actions: <Widget>[
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                FilledButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text('Delete'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            await widget.repository.delete(task.id);
+                            await _loadForDay(_selectedDay);
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Task deleted')),
+                            );
+                          }
+                        },
                       );
                     },
-                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
                   ),
           ),
         ],
