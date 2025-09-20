@@ -24,6 +24,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   bool _notifyDay = false;
   bool _saving = false;
   bool _submitted = false;
+  bool _prefilled = false;
 
   bool get _isEdit => widget.initial != null;
 
@@ -35,14 +36,20 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       _titleController.text = t.title;
       _descriptionController.text = t.description ?? '';
       _due = t.dueDate;
-      final String dateStr = t.dueDate.toLocal().toString().split(' ').first;
-      final TimeOfDay tod = TimeOfDay(
-        hour: t.dueDate.hour,
-        minute: t.dueDate.minute,
-      );
-      _dueController.text = '$dateStr ${tod.format(context)}';
       _notifyHour = t.notifyOneHourBefore;
       _notifyDay = t.notifyOneDayBefore;
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_prefilled && widget.initial != null && _due != null) {
+      final DateTime d = _due!;
+      final String dateStr = d.toLocal().toString().split(' ').first;
+      final TimeOfDay tod = TimeOfDay(hour: d.hour, minute: d.minute);
+      _dueController.text = '$dateStr ${tod.format(context)}';
+      _prefilled = true;
     }
   }
 
@@ -294,7 +301,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 _submitted && _saving
                     ? 'Saving…'
                     : _isEdit
-                    ? 'Update task'
+                    ? 'Save changes'
                     : 'Save task',
               ),
             ),
