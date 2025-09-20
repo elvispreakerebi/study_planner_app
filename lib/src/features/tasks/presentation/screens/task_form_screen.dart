@@ -22,6 +22,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   bool _notifyHour = false;
   bool _notifyDay = false;
   bool _saving = false;
+  bool _submitted = false;
 
   @override
   void dispose() {
@@ -135,6 +136,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   }
 
   Future<void> _save() async {
+    setState(() => _submitted = true);
     if (!_formKey.currentState!.validate()) return;
     if (_due == null) return;
 
@@ -161,7 +163,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       appBar: AppBar(title: const Text('New task')),
       body: Form(
         key: _formKey,
-        autovalidateMode: AutovalidateMode.onUserInteraction,
+        autovalidateMode: _submitted
+            ? AutovalidateMode.always
+            : AutovalidateMode.disabled,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: <Widget>[
@@ -242,7 +246,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.save),
-              label: Text(_saving ? 'Saving…' : 'Save task'),
+              label: Text(_submitted && _saving ? 'Saving…' : 'Save task'),
             ),
           ],
         ),
