@@ -16,16 +16,71 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _dueDateController = TextEditingController();
+  final TextEditingController _reminderTimeController = TextEditingController();
   DateTime? _dueDate = DateTime.now();
   TimeOfDay? _reminderTime;
   bool _saving = false;
 
   @override
+  void initState() {
+    super.initState();
+    if (_dueDate != null) {
+      _dueDateController.text = _dueDate!.toLocal().toString().split(' ').first;
+    }
+  }
+
+  @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _dueDateController.dispose();
+    _reminderTimeController.dispose();
     super.dispose();
   }
+
+  OutlineInputBorder _border(BuildContext context) => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(8),
+    borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
+  );
+
+  OutlineInputBorder _focusedBorder(BuildContext context) => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(8),
+    borderSide: BorderSide(
+      color: Theme.of(context).colorScheme.primary,
+      width: 2,
+    ),
+  );
+
+  InputDecoration _decoration({String? hintText, Widget? suffixIcon}) =>
+      InputDecoration(
+        hintText: hintText,
+        border: _border(context),
+        enabledBorder: _border(context),
+        focusedBorder: _focusedBorder(context),
+        errorBorder: _border(context).copyWith(
+          borderSide: BorderSide(
+            color: Theme.of(context).colorScheme.error,
+            width: 2,
+          ),
+        ),
+        focusedErrorBorder: _border(context).copyWith(
+          borderSide: BorderSide(
+            color: Theme.of(context).colorScheme.error,
+            width: 2,
+          ),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
+        suffixIcon: suffixIcon,
+      );
+
+  Widget _label(String text) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Text(text, style: Theme.of(context).textTheme.labelLarge),
+  );
 
   Future<void> _pickDueDate() async {
     final DateTime now = DateTime.now();
@@ -38,7 +93,10 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       lastDate: last,
     );
     if (picked != null) {
-      setState(() => _dueDate = picked);
+      setState(() {
+        _dueDate = picked;
+        _dueDateController.text = picked.toLocal().toString().split(' ').first;
+      });
     }
   }
 
@@ -49,7 +107,10 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       initialTime: _reminderTime ?? now,
     );
     if (picked != null) {
-      setState(() => _reminderTime = picked);
+      setState(() {
+        _reminderTime = picked;
+        _reminderTimeController.text = picked.format(context);
+      });
     }
   }
 
@@ -97,12 +158,14 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       appBar: AppBar(title: const Text('New task')),
       body: Form(
         key: _formKey,
+        autovalidateMode: AutovalidateMode.onUserInteraction,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: <Widget>[
+            _label('Title *'),
             TextFormField(
               controller: _titleController,
-              decoration: const InputDecoration(labelText: 'Title *'),
+              decoration: _decoration(hintText: 'Enter title'),
               textInputAction: TextInputAction.next,
               validator: (String? value) {
                 if (value == null || value.trim().isEmpty) {
@@ -112,32 +175,37 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               },
             ),
             const SizedBox(height: 12),
+            _label('Description (optional)'),
             TextFormField(
               controller: _descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description (optional)',
-              ),
+              decoration: _decoration(hintText: 'Add details...'),
               maxLines: 3,
             ),
             const SizedBox(height: 12),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.event),
-              title: Text(
-                _dueDate == null
-                    ? 'Pick due date'
-                    : _dueDate!.toLocal().toString().split(' ').first,
+            _label('Due date *'),
+            TextFormField(
+              controller: _dueDateController,
+              readOnly: true,
+              decoration: _decoration(
+                hintText: 'Select date',
+                suffixIcon: const Icon(Icons.event),
               ),
               onTap: _pickDueDate,
+              validator: (String? value) {
+                if (_dueDate == null) {
+                  return 'Please select a due date';
+                }
+                return null;
+              },
             ),
-            const SizedBox(height: 8),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.alarm),
-              title: Text(
-                _reminderTime == null
-                    ? 'Set reminder (optional)'
-                    : _reminderTime!.format(context),
+            const SizedBox(height: 12),
+            _label('Reminder time (optional)'),
+            TextFormField(
+              controller: _reminderTimeController,
+              readOnly: true,
+              decoration: _decoration(
+                hintText: 'Set reminder time',
+                suffixIcon: const Icon(Icons.alarm),
               ),
               onTap: _pickReminderTime,
             ),
