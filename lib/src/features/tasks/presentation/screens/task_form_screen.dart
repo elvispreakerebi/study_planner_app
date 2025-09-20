@@ -94,7 +94,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('New Task')),
+      appBar: AppBar(title: const Text('New task')),
       body: Form(
         key: _formKey,
         child: ListView(
