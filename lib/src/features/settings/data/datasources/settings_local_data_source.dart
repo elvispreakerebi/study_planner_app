@@ -17,12 +17,14 @@ class SettingsLocalDataSourcePrefs {
     final Map<String, dynamic> map = json.decode(raw) as Map<String, dynamic>;
     return AppSettings(
       remindersEnabled: map['remindersEnabled'] as bool? ?? true,
+      storageMethod: map['storageMethod'] as String? ?? 'prefs',
     );
   }
 
   Future<void> save(AppSettings settings) async {
     final Map<String, dynamic> map = <String, dynamic>{
       'remindersEnabled': settings.remindersEnabled,
+      'storageMethod': settings.storageMethod,
     };
     await _prefs.setString(StorageKeys.settings, json.encode(map));
   }

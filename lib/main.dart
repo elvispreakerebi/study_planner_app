@@ -642,6 +642,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _settings = updated);
   }
 
+  Future<void> _openStorageSheet() async {
+    await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.save_outlined),
+                title: const Text('Shared Preferences'),
+                subtitle: const Text('Store tasks as JSON (simpler)'),
+                trailing: _settings.storageMethod == 'prefs'
+                    ? const Icon(Icons.check, color: Colors.green)
+                    : null,
+                onTap: () => Navigator.pop(context, 'prefs'),
+              ),
+              const Divider(height: 0),
+              ListTile(
+                leading: const Icon(Icons.table_chart_outlined),
+                title: const Text('SQLite (sqflite)'),
+                subtitle: const Text('Store tasks in a table (advanced)'),
+                trailing: _settings.storageMethod == 'sqlite'
+                    ? const Icon(Icons.check, color: Colors.green)
+                    : null,
+                onTap: () => Navigator.pop(context, 'sqlite'),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    ).then((String? method) async {
+      if (method == null || method == _settings.storageMethod) return;
+      final AppSettings updated = _settings.copyWith(storageMethod: method);
+      await widget.settingsRepository.save(updated);
+      if (!mounted) return;
+      setState(() => _settings = updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Storage set to ${method == 'prefs' ? 'Shared Preferences' : 'SQLite'}',
+          ),
+        ),
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -660,10 +712,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: const Text('Enable or disable task reminders'),
           ),
           const Divider(),
-          const ListTile(
-            leading: Icon(Icons.storage_outlined),
-            title: Text('Storage'),
-            subtitle: Text('Using shared_preferences'),
+          ListTile(
+            leading: const Icon(Icons.storage_outlined),
+            title: const Text('Storage'),
+            subtitle: Text(
+              _settings.storageMethod == 'sqlite'
+                  ? 'SQLite (sqflite)'
+                  : 'Shared Preferences',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _openStorageSheet,
           ),
         ],
       ),
