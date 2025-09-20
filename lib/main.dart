@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:study_planner_app/src/features/calendar/presentation/widgets/monthly_calendar.dart';
+import 'package:study_planner_app/src/features/settings/data/datasources/settings_local_data_source.dart';
+import 'package:study_planner_app/src/features/settings/data/repositories/settings_repository_prefs.dart';
+import 'package:study_planner_app/src/features/settings/domain/entities/app_settings.dart';
+import 'package:study_planner_app/src/features/settings/domain/repositories/settings_repository.dart';
 import 'package:study_planner_app/src/features/tasks/data/datasources/task_local_data_source.dart';
 import 'package:study_planner_app/src/features/tasks/data/repositories/task_repository_prefs.dart';
 import 'package:study_planner_app/src/features/tasks/domain/entities/task.dart';
@@ -39,97 +43,182 @@ class AppScaffold extends StatefulWidget {
 class _AppScaffoldState extends State<AppScaffold> {
   int _currentIndex = 0;
 
-  Future<TaskRepository> _initRepository() async {
+  Future<(TaskRepository, SettingsRepository)> _initRepositories() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final TaskLocalDataSourcePrefs ds = TaskLocalDataSourcePrefs(prefs);
-    return TaskRepositoryPrefs(ds);
+    final TaskLocalDataSourcePrefs taskDs = TaskLocalDataSourcePrefs(prefs);
+    final SettingsLocalDataSourcePrefs settingsDs =
+        SettingsLocalDataSourcePrefs(prefs);
+    return (TaskRepositoryPrefs(taskDs), SettingsRepositoryPrefs(settingsDs));
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<TaskRepository>(
-      future: _initRepository(),
-      builder: (BuildContext context, AsyncSnapshot<TaskRepository> snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-        if (!snapshot.hasData) {
-          return const Scaffold(
-            body: Center(child: Text('Failed to initialize storage')),
-          );
-        }
-        final TaskRepository repo = snapshot.data!;
-        final List<Widget> screens = <Widget>[
-          TodayScreen(repository: repo),
-          CalendarScreen(repository: repo),
-          SettingsScreen(repository: repo),
-        ];
-        return Scaffold(
-          body: SafeArea(
-            child: IndexedStack(index: _currentIndex, children: screens),
-          ),
-          bottomNavigationBar: BottomNavigationBar(
-            currentIndex: _currentIndex,
-            onTap: (int index) {
-              setState(() {
-                _currentIndex = index;
-              });
-            },
-            items: const <BottomNavigationBarItem>[
-              BottomNavigationBarItem(
-                icon: Icon(Icons.today_outlined),
-                activeIcon: Icon(Icons.today),
-                label: 'Today',
+    return FutureBuilder<(TaskRepository, SettingsRepository)>(
+      future: _initRepositories(),
+      builder:
+          (
+            BuildContext context,
+            AsyncSnapshot<(TaskRepository, SettingsRepository)> snapshot,
+          ) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+            if (!snapshot.hasData) {
+              return const Scaffold(
+                body: Center(child: Text('Failed to initialize storage')),
+              );
+            }
+            final (TaskRepository taskRepo, SettingsRepository settingsRepo) =
+                snapshot.data!;
+            final List<Widget> screens = <Widget>[
+              TodayScreen(
+                taskRepository: taskRepo,
+                settingsRepository: settingsRepo,
               ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.calendar_month_outlined),
-                activeIcon: Icon(Icons.calendar_month),
-                label: 'Calendar',
+              CalendarScreen(repository: taskRepo),
+              SettingsScreen(settingsRepository: settingsRepo),
+            ];
+            return Scaffold(
+              body: SafeArea(
+                child: IndexedStack(index: _currentIndex, children: screens),
               ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.settings_outlined),
-                activeIcon: Icon(Icons.settings),
-                label: 'Settings',
+              bottomNavigationBar: BottomNavigationBar(
+                currentIndex: _currentIndex,
+                onTap: (int index) {
+                  setState(() {
+                    _currentIndex = index;
+                  });
+                },
+                items: const <BottomNavigationBarItem>[
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.today_outlined),
+                    activeIcon: Icon(Icons.today),
+                    label: 'Today',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.calendar_month_outlined),
+                    activeIcon: Icon(Icons.calendar_month),
+                    label: 'Calendar',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.settings_outlined),
+                    activeIcon: Icon(Icons.settings),
+                    label: 'Settings',
+                  ),
+                ],
+                type: BottomNavigationBarType.fixed,
+                selectedLabelStyle: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ],
-            type: BottomNavigationBarType.fixed,
-            selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-        );
-      },
+            );
+          },
     );
   }
 }
 
 class TodayScreen extends StatefulWidget {
-  const TodayScreen({super.key, required this.repository});
+  const TodayScreen({
+    super.key,
+    required this.taskRepository,
+    required this.settingsRepository,
+  });
 
-  final TaskRepository repository;
+  final TaskRepository taskRepository;
+  final SettingsRepository settingsRepository;
 
   @override
   State<TodayScreen> createState() => _TodayScreenState();
 }
 
-class _TodayScreenState extends State<TodayScreen> {
+class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
   List<Task> _tasks = <Task>[];
   bool _loading = false;
+  AppSettings _settings = const AppSettings();
+  final Set<String> _surfacedReminderIds = <String>{};
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _maybeShowReminders();
+    }
   }
 
   Future<void> _load() async {
     setState(() => _loading = true);
     final DateTime today = DateTime.now();
-    final List<Task> tasks = await widget.repository.getForDate(today);
+    final List<Task> tasks = await widget.taskRepository.getForDate(today);
+    final AppSettings settings = await widget.settingsRepository.load();
     setState(() {
       _tasks = tasks;
+      _settings = settings;
       _loading = false;
     });
+    _maybeShowReminders();
+  }
+
+  Future<void> _maybeShowReminders() async {
+    if (!_settings.remindersEnabled) return;
+    final DateTime now = DateTime.now();
+    final List<Task> due = _tasks
+        .where(
+          (Task t) =>
+              t.reminderTime != null &&
+              (t.reminderTime!.isBefore(now) ||
+                  t.reminderTime!.isAtSameMomentAs(now)) &&
+              !_surfacedReminderIds.contains(t.id),
+        )
+        .toList();
+    if (due.isEmpty) return;
+    _surfacedReminderIds.addAll(due.map((Task t) => t.id));
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Reminders'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: due.length,
+              itemBuilder: (BuildContext context, int index) {
+                final Task task = due[index];
+                return ListTile(
+                  dense: true,
+                  title: Text(task.title),
+                  subtitle:
+                      task.description != null && task.description!.isNotEmpty
+                      ? Text(task.description!)
+                      : null,
+                );
+              },
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _openCreateTask() async {
@@ -137,7 +226,7 @@ class _TodayScreenState extends State<TodayScreen> {
       MaterialPageRoute<bool>(
         fullscreenDialog: true,
         builder: (BuildContext context) =>
-            TaskFormScreen(repository: widget.repository),
+            TaskFormScreen(repository: widget.taskRepository),
       ),
     );
     if (created == true) {
@@ -276,29 +365,61 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 }
 
-class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key, required this.repository});
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key, required this.settingsRepository});
 
-  final TaskRepository repository;
+  final SettingsRepository settingsRepository;
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  AppSettings _settings = const AppSettings();
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final AppSettings s = await widget.settingsRepository.load();
+    setState(() {
+      _settings = s;
+      _loading = false;
+    });
+  }
+
+  Future<void> _toggleReminders(bool value) async {
+    final AppSettings updated = _settings.copyWith(remindersEnabled: value);
+    await widget.settingsRepository.save(updated);
+    setState(() => _settings = updated);
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         padding: const EdgeInsets.all(16),
-        children: const <Widget>[
-          ListTile(
-            leading: Icon(Icons.notifications_active_outlined),
-            title: Text('Reminders'),
-            subtitle: Text('Enable or disable task reminders'),
-            trailing: Icon(Icons.chevron_right),
+        children: <Widget>[
+          SwitchListTile(
+            value: _settings.remindersEnabled,
+            onChanged: _toggleReminders,
+            secondary: const Icon(Icons.notifications_active_outlined),
+            title: const Text('Reminders'),
+            subtitle: const Text('Enable or disable task reminders'),
           ),
-          Divider(),
-          ListTile(
+          const Divider(),
+          const ListTile(
             leading: Icon(Icons.storage_outlined),
             title: Text('Storage'),
-            subtitle: Text('Using shared_preferences by default'),
+            subtitle: Text('Using shared_preferences'),
           ),
         ],
       ),
