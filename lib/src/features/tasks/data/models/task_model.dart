@@ -7,7 +7,8 @@ class TaskModel {
   final String title;
   final String? description;
   final String dueDateIso;
-  final String? reminderTimeIso;
+  final bool notifyOneHourBefore;
+  final bool notifyOneDayBefore;
   final bool isCompleted;
   final String createdAtIso;
   final String updatedAtIso;
@@ -16,11 +17,12 @@ class TaskModel {
     required this.id,
     required this.title,
     required this.dueDateIso,
+    required this.notifyOneHourBefore,
+    required this.notifyOneDayBefore,
     required this.isCompleted,
     required this.createdAtIso,
     required this.updatedAtIso,
     this.description,
-    this.reminderTimeIso,
   });
 
   factory TaskModel.fromTask(Task task) {
@@ -29,7 +31,8 @@ class TaskModel {
       title: task.title,
       description: task.description,
       dueDateIso: task.dueDate.toIso8601String(),
-      reminderTimeIso: task.reminderTime?.toIso8601String(),
+      notifyOneHourBefore: task.notifyOneHourBefore,
+      notifyOneDayBefore: task.notifyOneDayBefore,
       isCompleted: task.isCompleted,
       createdAtIso: task.createdAt.toIso8601String(),
       updatedAtIso: task.updatedAt.toIso8601String(),
@@ -42,9 +45,8 @@ class TaskModel {
       title: title,
       description: description,
       dueDate: DateTime.parse(dueDateIso),
-      reminderTime: reminderTimeIso != null
-          ? DateTime.parse(reminderTimeIso!)
-          : null,
+      notifyOneHourBefore: notifyOneHourBefore,
+      notifyOneDayBefore: notifyOneDayBefore,
       isCompleted: isCompleted,
       createdAt: DateTime.parse(createdAtIso),
       updatedAt: DateTime.parse(updatedAtIso),
@@ -57,7 +59,8 @@ class TaskModel {
       'title': title,
       'description': description,
       'dueDate': dueDateIso,
-      'reminderTime': reminderTimeIso,
+      'notifyOneHourBefore': notifyOneHourBefore,
+      'notifyOneDayBefore': notifyOneDayBefore,
       'isCompleted': isCompleted,
       'createdAt': createdAtIso,
       'updatedAt': updatedAtIso,
@@ -70,7 +73,8 @@ class TaskModel {
       title: map['title'] as String,
       description: map['description'] as String?,
       dueDateIso: map['dueDate'] as String,
-      reminderTimeIso: map['reminderTime'] as String?,
+      notifyOneHourBefore: map['notifyOneHourBefore'] as bool? ?? false,
+      notifyOneDayBefore: map['notifyOneDayBefore'] as bool? ?? false,
       isCompleted: map['isCompleted'] as bool? ?? false,
       createdAtIso: map['createdAt'] as String,
       updatedAtIso: map['updatedAt'] as String,

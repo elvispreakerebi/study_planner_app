@@ -175,15 +175,28 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
   Future<void> _maybeShowReminders() async {
     if (!_settings.remindersEnabled) return;
     final DateTime now = DateTime.now();
+
+    DateTime thresholdFor(Task t) {
+      final List<Duration> offsets = <Duration>[];
+      if (t.notifyOneHourBefore) offsets.add(const Duration(hours: 1));
+      if (t.notifyOneDayBefore) offsets.add(const Duration(days: 1));
+      if (offsets.isEmpty)
+        return DateTime.fromMillisecondsSinceEpoch(1 << 62); // far future
+      final DateTime earliest = offsets
+          .map((Duration d) => t.dueDate.subtract(d))
+          .reduce((DateTime a, DateTime b) => a.isBefore(b) ? a : b);
+      return earliest;
+    }
+
     final List<Task> due = _tasks
         .where(
           (Task t) =>
-              t.reminderTime != null &&
-              (t.reminderTime!.isBefore(now) ||
-                  t.reminderTime!.isAtSameMomentAs(now)) &&
-              !_surfacedReminderIds.contains(t.id),
+              !_surfacedReminderIds.contains(t.id) &&
+              (t.notifyOneHourBefore || t.notifyOneDayBefore) &&
+              now.isAfter(thresholdFor(t)),
         )
         .toList();
+
     if (due.isEmpty) return;
     _surfacedReminderIds.addAll(due.map((Task t) => t.id));
     if (!mounted) return;
@@ -231,6 +244,10 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
     );
     if (created == true) {
       await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Task created')));
     }
   }
 

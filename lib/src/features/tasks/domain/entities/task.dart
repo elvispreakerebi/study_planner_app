@@ -5,8 +5,10 @@ class Task {
   final String id;
   final String title;
   final String? description;
+  // dueDate holds both date and time
   final DateTime dueDate;
-  final DateTime? reminderTime;
+  final bool notifyOneHourBefore;
+  final bool notifyOneDayBefore;
   final bool isCompleted;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -16,7 +18,8 @@ class Task {
     required this.title,
     required this.dueDate,
     this.description,
-    this.reminderTime,
+    this.notifyOneHourBefore = false,
+    this.notifyOneDayBefore = false,
     this.isCompleted = false,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -28,7 +31,8 @@ class Task {
     String? title,
     String? description,
     DateTime? dueDate,
-    DateTime? reminderTime,
+    bool? notifyOneHourBefore,
+    bool? notifyOneDayBefore,
     bool? isCompleted,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -38,7 +42,8 @@ class Task {
       title: title ?? this.title,
       description: description ?? this.description,
       dueDate: dueDate ?? this.dueDate,
-      reminderTime: reminderTime ?? this.reminderTime,
+      notifyOneHourBefore: notifyOneHourBefore ?? this.notifyOneHourBefore,
+      notifyOneDayBefore: notifyOneDayBefore ?? this.notifyOneDayBefore,
       isCompleted: isCompleted ?? this.isCompleted,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -53,7 +58,8 @@ class Task {
         other.title == title &&
         other.description == description &&
         other.dueDate == dueDate &&
-        other.reminderTime == reminderTime &&
+        other.notifyOneHourBefore == notifyOneHourBefore &&
+        other.notifyOneDayBefore == notifyOneDayBefore &&
         other.isCompleted == isCompleted &&
         other.createdAt == createdAt &&
         other.updatedAt == updatedAt;
@@ -65,7 +71,8 @@ class Task {
     title,
     description,
     dueDate,
-    reminderTime,
+    notifyOneHourBefore,
+    notifyOneDayBefore,
     isCompleted,
     createdAt,
     updatedAt,

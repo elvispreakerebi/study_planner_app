@@ -16,23 +16,17 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _dueDateController = TextEditingController();
-  final TextEditingController _reminderTimeController = TextEditingController();
-  DateTime? _dueDate; // start null to enforce required selection
-  TimeOfDay? _reminderTime;
+  final TextEditingController _dueController = TextEditingController();
+  DateTime? _due; // holds both date and time
+  bool _notifyHour = false;
+  bool _notifyDay = false;
   bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-  }
 
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
-    _dueDateController.dispose();
-    _reminderTimeController.dispose();
+    _dueController.dispose();
     super.dispose();
   }
 
@@ -79,59 +73,47 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     child: Text(text, style: Theme.of(context).textTheme.labelLarge),
   );
 
-  Future<void> _pickDueDate() async {
+  Future<void> _pickDue() async {
+    // pick date
     final DateTime now = DateTime.now();
     final DateTime first = DateTime(now.year - 1);
     final DateTime last = DateTime(now.year + 5);
-    final DateTime? picked = await showDatePicker(
+    final DateTime initialDate = _due ?? now;
+    final DateTime? pickedDate = await showDatePicker(
       context: context,
-      initialDate: _dueDate ?? now,
+      initialDate: initialDate,
       firstDate: first,
       lastDate: last,
     );
-    if (picked != null) {
-      setState(() {
-        _dueDate = picked;
-        _dueDateController.text = picked.toLocal().toString().split(' ').first;
-      });
-    }
-  }
+    if (pickedDate == null) return;
 
-  Future<void> _pickReminderTime() async {
-    final TimeOfDay now = TimeOfDay.now();
-    final TimeOfDay? picked = await showTimePicker(
+    // pick time
+    final TimeOfDay initialTime = _due != null
+        ? TimeOfDay(hour: _due!.hour, minute: _due!.minute)
+        : TimeOfDay.now();
+    final TimeOfDay? pickedTime = await showTimePicker(
       context: context,
-      initialTime: _reminderTime ?? now,
+      initialTime: initialTime,
     );
-    if (picked != null) {
-      setState(() {
-        _reminderTime = picked;
-        _reminderTimeController.text = picked.format(context);
-      });
-    }
+    if (pickedTime == null) return;
+
+    final DateTime combined = DateTime(
+      pickedDate.year,
+      pickedDate.month,
+      pickedDate.day,
+      pickedTime.hour,
+      pickedTime.minute,
+    );
+    setState(() {
+      _due = combined;
+      _dueController.text =
+          '${pickedDate.toLocal().toString().split(' ').first} ${pickedTime.format(context)}';
+    });
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_dueDate == null) return;
-
-    DateTime? reminderDateTime;
-    if (_reminderTime != null) {
-      final DateTime date = _dueDate!;
-      reminderDateTime = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        _reminderTime!.hour,
-        _reminderTime!.minute,
-      );
-      if (reminderDateTime.isBefore(DateTime.now())) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reminder time must be in the future')),
-        );
-        return;
-      }
-    }
+    if (_due == null) return;
 
     setState(() => _saving = true);
     final Task task = Task(
@@ -140,8 +122,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       description: _descriptionController.text.trim().isEmpty
           ? null
           : _descriptionController.text.trim(),
-      dueDate: _dueDate!,
-      reminderTime: reminderDateTime,
+      dueDate: _due!,
+      notifyOneHourBefore: _notifyHour,
+      notifyOneDayBefore: _notifyDay,
     );
     await widget.repository.create(task);
     if (!mounted) return;
@@ -171,43 +154,59 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 return null;
               },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
             _label('Description (optional)'),
             TextFormField(
               controller: _descriptionController,
               decoration: _decoration(hintText: 'Add details...'),
               maxLines: 3,
             ),
-            const SizedBox(height: 12),
-            _label('Due date *'),
+            const SizedBox(height: 20),
+            _label('Due *'),
             TextFormField(
-              controller: _dueDateController,
+              controller: _dueController,
               readOnly: true,
               decoration: _decoration(
-                hintText: 'Select date',
+                hintText: 'Select date and time',
                 suffixIcon: const Icon(Icons.event),
               ),
-              onTap: _pickDueDate,
+              onTap: _pickDue,
               validator: (String? value) {
-                if (_dueDate == null ||
-                    _dueDateController.text.trim().isEmpty) {
-                  return 'Please select a due date';
+                if (_due == null || _dueController.text.trim().isEmpty) {
+                  return 'Please select a due date and time';
                 }
                 return null;
               },
             ),
-            const SizedBox(height: 12),
-            _label('Reminder time (optional)'),
-            TextFormField(
-              controller: _reminderTimeController,
-              readOnly: true,
-              decoration: _decoration(
-                hintText: 'Set reminder time',
-                suffixIcon: const Icon(Icons.alarm),
+            const SizedBox(height: 20),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+                borderRadius: BorderRadius.circular(8),
               ),
-              onTap: _pickReminderTime,
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Notify me 1 hour before'),
+                    value: _notifyHour,
+                    onChanged: (bool v) => setState(() => _notifyHour = v),
+                  ),
+                  const Divider(height: 1),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Notify me 1 day before'),
+                    value: _notifyDay,
+                    onChanged: (bool v) => setState(() => _notifyDay = v),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
             FilledButton.icon(
               style: FilledButton.styleFrom(
                 minimumSize: const Size.fromHeight(56),
