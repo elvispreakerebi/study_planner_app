@@ -160,10 +160,13 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    if (mounted) {
+      setState(() => _loading = true);
+    }
     final DateTime today = DateTime.now();
     final List<Task> tasks = await widget.taskRepository.getForDate(today);
     final AppSettings settings = await widget.settingsRepository.load();
+    if (!mounted) return;
     setState(() {
       _tasks = tasks;
       _settings = settings;
@@ -235,19 +238,25 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _openCreateTask() async {
-    final bool? created = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
+    final Task? created = await Navigator.of(context).push<Task>(
+      MaterialPageRoute<Task>(
         fullscreenDialog: true,
         builder: (BuildContext context) =>
             TaskFormScreen(repository: widget.taskRepository),
       ),
     );
-    if (created == true) {
+    if (created != null) {
       await _load();
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Task created')));
+      final DateTime now = DateTime.now();
+      final bool isToday =
+          created.dueDate.year == now.year &&
+          created.dueDate.month == now.month &&
+          created.dueDate.day == now.day;
+      final String msg = isToday
+          ? 'New task saved'
+          : 'New task saved, check calendar';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 

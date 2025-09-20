@@ -152,7 +152,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     await widget.repository.create(task);
     if (!mounted) return;
     setState(() => _saving = false);
-    Navigator.of(context).pop(true);
+    Navigator.of(context).pop<Task>(task);
   }
 
   @override
@@ -242,7 +242,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.save),
-              label: const Text('Save task'),
+              label: Text(_saving ? 'Saving…' : 'Save task'),
             ),
           ],
         ),
