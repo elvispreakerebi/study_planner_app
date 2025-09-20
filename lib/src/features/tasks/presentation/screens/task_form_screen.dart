@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:study_planner_app/src/features/tasks/domain/entities/task.dart';
 import 'package:study_planner_app/src/features/tasks/domain/repositories/task_repository.dart';
 import 'package:uuid/uuid.dart';
@@ -73,42 +74,64 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     child: Text(text, style: Theme.of(context).textTheme.labelLarge),
   );
 
-  Future<void> _pickDue() async {
-    // pick date
-    final DateTime now = DateTime.now();
-    final DateTime first = DateTime(now.year - 1);
-    final DateTime last = DateTime(now.year + 5);
-    final DateTime initialDate = _due ?? now;
-    final DateTime? pickedDate = await showDatePicker(
+  Future<void> _pickDueCombined() async {
+    final DateTime initial = _due ?? DateTime.now();
+    DateTime temp = initial;
+    final DateTime? selected = await showModalBottomSheet<DateTime>(
       context: context,
-      initialDate: initialDate,
-      firstDate: first,
-      lastDate: last,
+      useSafeArea: true,
+      isScrollControlled: true,
+      builder: (BuildContext context) {
+        return SizedBox(
+          height: 360,
+          child: Column(
+            children: <Widget>[
+              Expanded(
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.dateAndTime,
+                  initialDateTime: initial,
+                  use24hFormat: false,
+                  onDateTimeChanged: (DateTime value) {
+                    temp = value;
+                  },
+                ),
+              ),
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: <Widget>[
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(temp),
+                      child: const Text('Done'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
-    if (pickedDate == null) return;
-
-    // pick time
-    final TimeOfDay initialTime = _due != null
-        ? TimeOfDay(hour: _due!.hour, minute: _due!.minute)
-        : TimeOfDay.now();
-    final TimeOfDay? pickedTime = await showTimePicker(
-      context: context,
-      initialTime: initialTime,
-    );
-    if (pickedTime == null) return;
-
-    final DateTime combined = DateTime(
-      pickedDate.year,
-      pickedDate.month,
-      pickedDate.day,
-      pickedTime.hour,
-      pickedTime.minute,
-    );
-    setState(() {
-      _due = combined;
-      _dueController.text =
-          '${pickedDate.toLocal().toString().split(' ').first} ${pickedTime.format(context)}';
-    });
+    if (selected != null) {
+      setState(() {
+        _due = selected;
+        final String dateStr = selected.toLocal().toString().split(' ').first;
+        final TimeOfDay tod = TimeOfDay(
+          hour: selected.hour,
+          minute: selected.minute,
+        );
+        _dueController.text = '$dateStr ${tod.format(context)}';
+      });
+    }
   }
 
   Future<void> _save() async {
@@ -170,7 +193,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 hintText: 'Select date and time',
                 suffixIcon: const Icon(Icons.event),
               ),
-              onTap: _pickDue,
+              onTap: _pickDueCombined,
               validator: (String? value) {
                 if (_due == null || _dueController.text.trim().isEmpty) {
                   return 'Please select a due date and time';
