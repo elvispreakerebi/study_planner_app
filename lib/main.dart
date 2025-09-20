@@ -318,11 +318,21 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
                       ),
                     );
                     if (confirm == true) {
+                      final Task deleted = task;
                       await widget.taskRepository.delete(task.id);
                       await _load();
                       if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Task deleted')),
+                        SnackBar(
+                          content: const Text('Task deleted'),
+                          action: SnackBarAction(
+                            label: 'Undo',
+                            onPressed: () async {
+                              await widget.taskRepository.create(deleted);
+                              await _load();
+                            },
+                          ),
+                        ),
                       );
                     }
                   },
@@ -536,11 +546,21 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             ),
                           );
                           if (confirm == true) {
+                            final Task deleted = task;
                             await widget.repository.delete(task.id);
                             await _loadForDay(_selectedDay);
                             if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Task deleted')),
+                              SnackBar(
+                                content: const Text('Task deleted'),
+                                action: SnackBarAction(
+                                  label: 'Undo',
+                                  onPressed: () async {
+                                    await widget.repository.create(deleted);
+                                    await _loadForDay(_selectedDay);
+                                  },
+                                ),
+                              ),
                             );
                           }
                         },
