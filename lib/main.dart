@@ -281,18 +281,22 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
                 return TaskCard(
                   task: task,
                   onEdit: () async {
-                    // open edit mode later
                     final Task? updated = await Navigator.of(context)
                         .push<Task>(
                           MaterialPageRoute<Task>(
                             fullscreenDialog: true,
                             builder: (BuildContext context) => TaskFormScreen(
                               repository: widget.taskRepository,
+                              initial: task,
                             ),
                           ),
                         );
                     if (updated != null) {
                       await _load();
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Task updated')),
+                      );
                     }
                   },
                   onDelete: () async {
@@ -498,11 +502,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   builder: (BuildContext context) =>
                                       TaskFormScreen(
                                         repository: widget.repository,
+                                        initial: task,
                                       ),
                                 ),
                               );
                           if (updated != null) {
                             await _loadForDay(_selectedDay);
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Task updated')),
+                            );
                           }
                         },
                         onDelete: () async {

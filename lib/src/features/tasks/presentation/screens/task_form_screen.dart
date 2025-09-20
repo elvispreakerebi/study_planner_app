@@ -5,9 +5,10 @@ import 'package:study_planner_app/src/features/tasks/domain/repositories/task_re
 import 'package:uuid/uuid.dart';
 
 class TaskFormScreen extends StatefulWidget {
-  const TaskFormScreen({super.key, required this.repository});
+  const TaskFormScreen({super.key, required this.repository, this.initial});
 
   final TaskRepository repository;
+  final Task? initial;
 
   @override
   State<TaskFormScreen> createState() => _TaskFormScreenState();
@@ -23,6 +24,27 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   bool _notifyDay = false;
   bool _saving = false;
   bool _submitted = false;
+
+  bool get _isEdit => widget.initial != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initial != null) {
+      final Task t = widget.initial!;
+      _titleController.text = t.title;
+      _descriptionController.text = t.description ?? '';
+      _due = t.dueDate;
+      final String dateStr = t.dueDate.toLocal().toString().split(' ').first;
+      final TimeOfDay tod = TimeOfDay(
+        hour: t.dueDate.hour,
+        minute: t.dueDate.minute,
+      );
+      _dueController.text = '$dateStr ${tod.format(context)}';
+      _notifyHour = t.notifyOneHourBefore;
+      _notifyDay = t.notifyOneDayBefore;
+    }
+  }
 
   @override
   void dispose() {
@@ -141,26 +163,48 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     if (_due == null) return;
 
     setState(() => _saving = true);
-    final Task task = Task(
-      id: const Uuid().v4(),
-      title: _titleController.text.trim(),
-      description: _descriptionController.text.trim().isEmpty
-          ? null
-          : _descriptionController.text.trim(),
-      dueDate: _due!,
-      notifyOneHourBefore: _notifyHour,
-      notifyOneDayBefore: _notifyDay,
-    );
-    await widget.repository.create(task);
+    final Task base =
+        widget.initial ??
+        Task(
+          id: const Uuid().v4(),
+          title: _titleController.text.trim(),
+          description: _descriptionController.text.trim().isEmpty
+              ? null
+              : _descriptionController.text.trim(),
+          dueDate: _due!,
+          notifyOneHourBefore: _notifyHour,
+          notifyOneDayBefore: _notifyDay,
+        );
+
+    final Task toPersist = widget.initial == null
+        ? base
+        : base.copyWith(
+            id: widget.initial!.id,
+            title: _titleController.text.trim(),
+            description: _descriptionController.text.trim().isEmpty
+                ? null
+                : _descriptionController.text.trim(),
+            dueDate: _due!,
+            notifyOneHourBefore: _notifyHour,
+            notifyOneDayBefore: _notifyDay,
+            updatedAt: DateTime.now(),
+          );
+
+    if (widget.initial == null) {
+      await widget.repository.create(toPersist);
+    } else {
+      await widget.repository.update(toPersist);
+    }
+
     if (!mounted) return;
     setState(() => _saving = false);
-    Navigator.of(context).pop<Task>(task);
+    Navigator.of(context).pop<Task>(toPersist);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('New task')),
+      appBar: AppBar(title: Text(_isEdit ? 'Edit task' : 'New task')),
       body: Form(
         key: _formKey,
         autovalidateMode: _submitted
@@ -246,7 +290,13 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.save),
-              label: Text(_submitted && _saving ? 'Saving…' : 'Save task'),
+              label: Text(
+                _submitted && _saving
+                    ? 'Saving…'
+                    : _isEdit
+                    ? 'Update task'
+                    : 'Save task',
+              ),
             ),
           ],
         ),
