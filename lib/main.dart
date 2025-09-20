@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:study_planner_app/src/features/calendar/presentation/widgets/monthly_calendar.dart';
 import 'package:study_planner_app/src/features/tasks/data/datasources/task_local_data_source.dart';
 import 'package:study_planner_app/src/features/tasks/data/repositories/task_repository_prefs.dart';
 import 'package:study_planner_app/src/features/tasks/domain/entities/task.dart';
@@ -181,16 +182,96 @@ class _TodayScreenState extends State<TodayScreen> {
   }
 }
 
-class CalendarScreen extends StatelessWidget {
+class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key, required this.repository});
 
   final TaskRepository repository;
 
   @override
+  State<CalendarScreen> createState() => _CalendarScreenState();
+}
+
+class _CalendarScreenState extends State<CalendarScreen> {
+  DateTime _selectedDay = DateTime.now();
+  List<Task> _tasks = <Task>[];
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadForDay(_selectedDay);
+  }
+
+  Future<void> _loadForDay(DateTime day) async {
+    setState(() => _loading = true);
+    final List<Task> tasks = await widget.repository.getForDate(day);
+    setState(() {
+      _tasks = tasks;
+      _loading = false;
+    });
+  }
+
+  Future<Set<DateTime>> _loadMarkedDaysForMonth(DateTime month) async {
+    final List<Task> all = await widget.repository.getAll();
+    final Set<DateTime> days = all
+        .map(
+          (Task t) => DateTime(t.dueDate.year, t.dueDate.month, t.dueDate.day),
+        )
+        .toSet();
+    return days;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Calendar')),
-      body: const Center(child: Text('Select a date to view tasks')),
+      body: Column(
+        children: <Widget>[
+          FutureBuilder<Set<DateTime>>(
+            future: _loadMarkedDaysForMonth(_selectedDay),
+            builder:
+                (BuildContext context, AsyncSnapshot<Set<DateTime>> snapshot) {
+                  final Set<DateTime> marked = snapshot.data ?? <DateTime>{};
+                  return MonthlyCalendar(
+                    selectedDay: _selectedDay,
+                    markedDays: marked,
+                    onDaySelected: (DateTime day) {
+                      setState(() => _selectedDay = day);
+                      _loadForDay(day);
+                    },
+                  );
+                },
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _tasks.isEmpty
+                ? const Center(child: Text('No tasks on this date'))
+                : ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: _tasks.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      final Task task = _tasks[index];
+                      return ListTile(
+                        leading: Icon(
+                          task.isCompleted
+                              ? Icons.check_circle
+                              : Icons.radio_button_unchecked,
+                        ),
+                        title: Text(task.title),
+                        subtitle:
+                            task.description != null &&
+                                task.description!.isNotEmpty
+                            ? Text(task.description!)
+                            : null,
+                      );
+                    },
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
