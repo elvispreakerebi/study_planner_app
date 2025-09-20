@@ -1,3 +1,4 @@
+/// TaskRepository implementation backed by SQLite using sqflite.
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 import 'package:study_planner_app/src/features/tasks/domain/entities/task.dart';
@@ -10,6 +11,7 @@ class TaskRepositorySqlite implements TaskRepository {
 
   static const String _table = 'tasks';
 
+  /// Opens (or creates) the tasks database and returns a repository instance.
   static Future<TaskRepositorySqlite> open() async {
     final String dbPath = await getDatabasesPath();
     final String path = p.join(dbPath, 'study_planner.db');
@@ -59,6 +61,7 @@ CREATE TABLE $_table (
     updatedAt: DateTime.parse(row['updatedAtIso']! as String),
   );
 
+  /// Inserts or replaces a task.
   @override
   Future<void> create(Task task) async {
     await _db.insert(
@@ -68,6 +71,7 @@ CREATE TABLE $_table (
     );
   }
 
+  /// Updates an existing task by id.
   @override
   Future<void> update(Task task) async {
     await _db.update(
@@ -78,11 +82,13 @@ CREATE TABLE $_table (
     );
   }
 
+  /// Deletes a task by id.
   @override
   Future<void> delete(String id) async {
     await _db.delete(_table, where: 'id = ?', whereArgs: <Object?>[id]);
   }
 
+  /// Returns all tasks sorted by due date.
   @override
   Future<List<Task>> getAll() async {
     final List<Map<String, Object?>> rows = await _db.query(
@@ -92,6 +98,7 @@ CREATE TABLE $_table (
     return rows.map(_fromRow).toList();
   }
 
+  /// Returns tasks due on the specified calendar day.
   @override
   Future<List<Task>> getForDate(DateTime day) async {
     final DateTime start = DateTime(day.year, day.month, day.day);

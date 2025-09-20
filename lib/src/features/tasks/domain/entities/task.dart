@@ -1,16 +1,33 @@
 import 'package:flutter/foundation.dart';
 
+/// Immutable task entity representing a study task with due date and reminder flags.
 @immutable
 class Task {
+  /// Unique identifier (UUID).
   final String id;
+
+  /// Short title describing the task.
   final String title;
+
+  /// Optional detailed description.
   final String? description;
-  // dueDate holds both date and time
+
+  /// Due date and time for the task.
   final DateTime dueDate;
+
+  /// Whether to surface a reminder one hour before due.
   final bool notifyOneHourBefore;
+
+  /// Whether to surface a reminder one day before due.
   final bool notifyOneDayBefore;
+
+  /// Completion flag.
   final bool isCompleted;
+
+  /// Creation timestamp.
   final DateTime createdAt;
+
+  /// Last update timestamp.
   final DateTime updatedAt;
 
   Task({
@@ -26,6 +43,7 @@ class Task {
   }) : createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now();
 
+  /// Returns a new copy of this task with select fields replaced.
   Task copyWith({
     String? id,
     String? title,

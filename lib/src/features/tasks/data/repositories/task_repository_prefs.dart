@@ -1,13 +1,16 @@
+/// TaskRepository implementation backed by Shared Preferences (JSON list).
 import 'package:study_planner_app/src/features/tasks/data/datasources/task_local_data_source.dart';
 import 'package:study_planner_app/src/features/tasks/data/models/task_model.dart';
 import 'package:study_planner_app/src/features/tasks/domain/entities/task.dart';
 import 'package:study_planner_app/src/features/tasks/domain/repositories/task_repository.dart';
 
+/// Stores and retrieves tasks via a JSON array persisted in Shared Preferences.
 class TaskRepositoryPrefs implements TaskRepository {
   TaskRepositoryPrefs(this._ds);
 
   final TaskLocalDataSourcePrefs _ds;
 
+  /// Appends a task to storage.
   @override
   Future<void> create(Task task) async {
     final List<TaskModel> all = await _ds.readAll();
@@ -16,6 +19,7 @@ class TaskRepositoryPrefs implements TaskRepository {
     await _ds.writeAll(updated);
   }
 
+  /// Updates a task by id (creates if missing).
   @override
   Future<void> update(Task task) async {
     final List<TaskModel> all = await _ds.readAll();
@@ -29,6 +33,7 @@ class TaskRepositoryPrefs implements TaskRepository {
     await _ds.writeAll(updated);
   }
 
+  /// Deletes a task by id.
   @override
   Future<void> delete(String id) async {
     final List<TaskModel> all = await _ds.readAll();
@@ -38,12 +43,14 @@ class TaskRepositoryPrefs implements TaskRepository {
     await _ds.writeAll(updated);
   }
 
+  /// Returns all tasks.
   @override
   Future<List<Task>> getAll() async {
     final List<TaskModel> all = await _ds.readAll();
     return all.map((TaskModel m) => m.toTask()).toList();
   }
 
+  /// Returns tasks whose due date falls on the given calendar day.
   @override
   Future<List<Task>> getForDate(DateTime day) async {
     final List<Task> all = await getAll();

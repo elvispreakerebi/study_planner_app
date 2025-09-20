@@ -1,3 +1,4 @@
+/// Study Planner App entrypoint and app shell.
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,10 +15,7 @@ import 'package:study_planner_app/src/features/tasks/domain/repositories/task_re
 import 'package:study_planner_app/src/features/tasks/presentation/screens/task_form_screen.dart';
 import 'package:study_planner_app/src/features/tasks/presentation/widgets/task_card.dart';
 
-void main() {
-  runApp(const StudyPlannerApp());
-}
-
+/// Root widget configuring Material 3 theme and the tab scaffold.
 class StudyPlannerApp extends StatelessWidget {
   const StudyPlannerApp({super.key});
 
@@ -36,6 +34,7 @@ class StudyPlannerApp extends StatelessWidget {
   }
 }
 
+/// Hosts the bottom navigation and wires repositories into screens.
 class AppScaffold extends StatefulWidget {
   const AppScaffold({super.key});
 
@@ -47,6 +46,7 @@ class _AppScaffoldState extends State<AppScaffold> {
   int _currentIndex = 0;
   (TaskRepository, SettingsRepository)? _repos;
 
+  /// Initializes repositories based on saved storage method.
   Future<(TaskRepository, SettingsRepository)> _initRepositories() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final TaskLocalDataSourcePrefs taskDs = TaskLocalDataSourcePrefs(prefs);
@@ -77,6 +77,7 @@ class _AppScaffoldState extends State<AppScaffold> {
     _ensureRepos();
   }
 
+  /// Migrates tasks between storage backends and hot-swaps the active repo.
   Future<void> _maybeMigrateStorage(String newMethod) async {
     if (_repos == null) return;
     final (TaskRepository currentTaskRepo, SettingsRepository settingsRepo) =
@@ -84,7 +85,6 @@ class _AppScaffoldState extends State<AppScaffold> {
     final AppSettings settings = await settingsRepo.load();
     if (settings.storageMethod == newMethod) return;
 
-    // Source repo: currentTaskRepo; Destination repo: new repo
     final TaskRepository destinationRepo = newMethod == 'sqlite'
         ? await TaskRepositorySqlite.open()
         : TaskRepositoryPrefs(
@@ -92,18 +92,14 @@ class _AppScaffoldState extends State<AppScaffold> {
           );
 
     final List<Task> all = await currentTaskRepo.getAll();
-
-    // Clear destination tasks to avoid duplicates (best effort: delete by ids first)
     for (final Task t in all) {
       await destinationRepo.delete(t.id);
       await destinationRepo.create(t);
     }
 
-    // Persist new settings
     final AppSettings updated = settings.copyWith(storageMethod: newMethod);
     await settingsRepo.save(updated);
 
-    // Swap active repo and rebuild
     _repos = (destinationRepo, settingsRepo);
     if (mounted) setState(() {});
   }
@@ -158,6 +154,7 @@ class _AppScaffoldState extends State<AppScaffold> {
   }
 }
 
+/// Displays tasks due today and surfaces reminders.
 class TodayScreen extends StatefulWidget {
   const TodayScreen({
     super.key,
