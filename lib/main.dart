@@ -8,6 +8,7 @@ import 'package:study_planner_app/src/features/settings/domain/entities/app_sett
 import 'package:study_planner_app/src/features/settings/domain/repositories/settings_repository.dart';
 import 'package:study_planner_app/src/features/tasks/data/datasources/task_local_data_source.dart';
 import 'package:study_planner_app/src/features/tasks/data/repositories/task_repository_prefs.dart';
+import 'package:study_planner_app/src/features/tasks/data/repositories/task_repository_sqlite.dart';
 import 'package:study_planner_app/src/features/tasks/domain/entities/task.dart';
 import 'package:study_planner_app/src/features/tasks/domain/repositories/task_repository.dart';
 import 'package:study_planner_app/src/features/tasks/presentation/screens/task_form_screen.dart';
@@ -44,79 +45,115 @@ class AppScaffold extends StatefulWidget {
 
 class _AppScaffoldState extends State<AppScaffold> {
   int _currentIndex = 0;
+  (TaskRepository, SettingsRepository)? _repos;
 
   Future<(TaskRepository, SettingsRepository)> _initRepositories() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final TaskLocalDataSourcePrefs taskDs = TaskLocalDataSourcePrefs(prefs);
     final SettingsLocalDataSourcePrefs settingsDs =
         SettingsLocalDataSourcePrefs(prefs);
-    return (TaskRepositoryPrefs(taskDs), SettingsRepositoryPrefs(settingsDs));
+    final SettingsRepository settingsRepo = SettingsRepositoryPrefs(settingsDs);
+    final AppSettings settings = await settingsRepo.load();
+
+    TaskRepository taskRepo;
+    if (settings.storageMethod == 'sqlite') {
+      taskRepo = await TaskRepositorySqlite.open();
+    } else {
+      taskRepo = TaskRepositoryPrefs(taskDs);
+    }
+    return (taskRepo, settingsRepo);
+  }
+
+  Future<void> _ensureRepos() async {
+    if (_repos == null) {
+      _repos = await _initRepositories();
+      if (mounted) setState(() {});
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _ensureRepos();
+  }
+
+  Future<void> _maybeMigrateStorage(String newMethod) async {
+    if (_repos == null) return;
+    final (TaskRepository currentTaskRepo, SettingsRepository settingsRepo) =
+        _repos!;
+    final AppSettings settings = await settingsRepo.load();
+    if (settings.storageMethod == newMethod) return;
+
+    // Source repo: currentTaskRepo; Destination repo: new repo
+    final TaskRepository destinationRepo = newMethod == 'sqlite'
+        ? await TaskRepositorySqlite.open()
+        : TaskRepositoryPrefs(
+            TaskLocalDataSourcePrefs(await SharedPreferences.getInstance()),
+          );
+
+    final List<Task> all = await currentTaskRepo.getAll();
+
+    // Clear destination tasks to avoid duplicates (best effort: delete by ids first)
+    for (final Task t in all) {
+      await destinationRepo.delete(t.id);
+      await destinationRepo.create(t);
+    }
+
+    // Persist new settings
+    final AppSettings updated = settings.copyWith(storageMethod: newMethod);
+    await settingsRepo.save(updated);
+
+    // Swap active repo and rebuild
+    _repos = (destinationRepo, settingsRepo);
+    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<(TaskRepository, SettingsRepository)>(
-      future: _initRepositories(),
-      builder:
-          (
-            BuildContext context,
-            AsyncSnapshot<(TaskRepository, SettingsRepository)> snapshot,
-          ) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              );
-            }
-            if (!snapshot.hasData) {
-              return const Scaffold(
-                body: Center(child: Text('Failed to initialize storage')),
-              );
-            }
-            final (TaskRepository taskRepo, SettingsRepository settingsRepo) =
-                snapshot.data!;
-            final List<Widget> screens = <Widget>[
-              TodayScreen(
-                taskRepository: taskRepo,
-                settingsRepository: settingsRepo,
-              ),
-              CalendarScreen(repository: taskRepo),
-              SettingsScreen(settingsRepository: settingsRepo),
-            ];
-            return Scaffold(
-              body: SafeArea(
-                child: IndexedStack(index: _currentIndex, children: screens),
-              ),
-              bottomNavigationBar: BottomNavigationBar(
-                currentIndex: _currentIndex,
-                onTap: (int index) {
-                  setState(() {
-                    _currentIndex = index;
-                  });
-                },
-                items: const <BottomNavigationBarItem>[
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.today_outlined),
-                    activeIcon: Icon(Icons.today),
-                    label: 'Today',
-                  ),
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.calendar_month_outlined),
-                    activeIcon: Icon(Icons.calendar_month),
-                    label: 'Calendar',
-                  ),
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.settings_outlined),
-                    activeIcon: Icon(Icons.settings),
-                    label: 'Settings',
-                  ),
-                ],
-                type: BottomNavigationBarType.fixed,
-                selectedLabelStyle: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            );
-          },
+    if (_repos == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    final (TaskRepository taskRepo, SettingsRepository settingsRepo) = _repos!;
+
+    final List<Widget> screens = <Widget>[
+      TodayScreen(taskRepository: taskRepo, settingsRepository: settingsRepo),
+      CalendarScreen(repository: taskRepo),
+      SettingsScreen(
+        settingsRepository: settingsRepo,
+        onStorageChanged: _maybeMigrateStorage,
+      ),
+    ];
+    return Scaffold(
+      body: SafeArea(
+        child: IndexedStack(index: _currentIndex, children: screens),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (int index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.today_outlined),
+            activeIcon: Icon(Icons.today),
+            label: 'Today',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_month_outlined),
+            activeIcon: Icon(Icons.calendar_month),
+            label: 'Calendar',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings_outlined),
+            activeIcon: Icon(Icons.settings),
+            label: 'Settings',
+          ),
+        ],
+        type: BottomNavigationBarType.fixed,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
+      ),
     );
   }
 }
@@ -610,9 +647,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
 }
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.settingsRepository});
+  const SettingsScreen({
+    super.key,
+    required this.settingsRepository,
+    this.onStorageChanged,
+  });
 
   final SettingsRepository settingsRepository;
+  final Future<void> Function(String method)? onStorageChanged;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -680,6 +722,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       },
     ).then((String? method) async {
       if (method == null || method == _settings.storageMethod) return;
+      // Migrate and swap via callback
+      if (widget.onStorageChanged != null) {
+        await widget.onStorageChanged!(method);
+      }
       final AppSettings updated = _settings.copyWith(storageMethod: method);
       await widget.settingsRepository.save(updated);
       if (!mounted) return;
