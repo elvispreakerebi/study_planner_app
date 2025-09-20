@@ -50,6 +50,7 @@ class TaskCard extends StatelessWidget {
                     },
                     icon: const Icon(Icons.edit_outlined),
                   ),
+                  const SizedBox(width: 16),
                   IconButton(
                     tooltip: 'Delete',
                     onPressed: () {
@@ -84,70 +85,89 @@ class TaskCard extends StatelessWidget {
     );
   }
 
+  bool _doesOverflowSingleLine(
+    BuildContext context,
+    String text,
+    double maxWidth,
+  ) {
+    final TextStyle style =
+        Theme.of(context).textTheme.bodyMedium ?? const TextStyle();
+    final TextPainter tp = TextPainter(
+      text: TextSpan(text: text, style: style),
+      maxLines: 1,
+      textDirection: Directionality.of(context),
+      ellipsis: '…',
+    )..layout(maxWidth: maxWidth);
+    return tp.didExceedMaxLines;
+  }
+
   @override
   Widget build(BuildContext context) {
     final String dueText = _formatDue(task.dueDate);
-    final String? description = task.description;
+    final String description = task.description ?? '';
 
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    task.title,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(dueText, style: Theme.of(context).textTheme.bodySmall),
-                  const SizedBox(height: 8),
-                  if (description != null && description.isNotEmpty)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Expanded(
-                          child: Text(
-                            description,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () => _showDetails(context),
-                          child: const Text('See more'),
-                        ),
-                      ],
-                    )
-                  else
-                    Text(
-                      'No description',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Column(
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            final bool showSeeMore =
+                description.isNotEmpty &&
+                _doesOverflowSingleLine(
+                  context,
+                  description,
+                  constraints.maxWidth - 24,
+                ); // padding allowance
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                IconButton(
-                  tooltip: 'Edit',
-                  onPressed: onEdit,
-                  icon: const Icon(Icons.edit_outlined),
+                Text(
+                  task.title,
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-                IconButton(
-                  tooltip: 'Delete',
-                  onPressed: onDelete,
-                  icon: const Icon(Icons.delete_outline),
+                const SizedBox(height: 2),
+                Text(dueText, style: Theme.of(context).textTheme.bodySmall),
+                const SizedBox(height: 8),
+                if (description.isNotEmpty)
+                  Text(
+                    description,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  )
+                else
+                  Text(
+                    'No description',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                const SizedBox(height: 8),
+                Row(
+                  children: <Widget>[
+                    if (showSeeMore)
+                      TextButton(
+                        onPressed: () => _showDetails(context),
+                        child: const Text('See more'),
+                      )
+                    else
+                      const SizedBox.shrink(),
+                    const Spacer(),
+                    IconButton(
+                      tooltip: 'Edit',
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.edit_outlined),
+                    ),
+                    const SizedBox(width: 16),
+                    IconButton(
+                      tooltip: 'Delete',
+                      onPressed: onDelete,
+                      icon: const Icon(Icons.delete_outline),
+                    ),
+                  ],
                 ),
               ],
-            ),
-          ],
+            );
+          },
         ),
       ),
     );

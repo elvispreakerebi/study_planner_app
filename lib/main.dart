@@ -139,6 +139,7 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
   bool _loading = false;
   AppSettings _settings = const AppSettings();
   final Set<String> _surfacedReminderIds = <String>{};
+  bool _remindersDialogShown = false;
 
   @override
   void initState() {
@@ -177,6 +178,7 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _maybeShowReminders() async {
+    if (_remindersDialogShown) return;
     if (!_settings.remindersEnabled) return;
     final DateTime now = DateTime.now();
 
@@ -204,6 +206,7 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
     if (due.isEmpty) return;
     _surfacedReminderIds.addAll(due.map((Task t) => t.id));
     if (!mounted) return;
+    _remindersDialogShown = true;
     await showDialog<void>(
       context: context,
       builder: (BuildContext context) {
