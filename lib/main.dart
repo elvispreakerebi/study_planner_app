@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:study_planner_app/src/features/calendar/presentation/widgets/monthly_calendar.dart';
 import 'package:study_planner_app/src/features/settings/data/datasources/settings_local_data_source.dart';
@@ -347,11 +348,31 @@ class _CalendarScreenState extends State<CalendarScreen> {
   DateTime _selectedDay = DateTime.now();
   List<Task> _tasks = <Task>[];
   bool _loading = false;
+  final ScrollController _scrollController = ScrollController();
+  bool _showSticky = false;
 
   @override
   void initState() {
     super.initState();
     _loadForDay(_selectedDay);
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    // Threshold at which sticky header appears (approx calendar height)
+    const double threshold = 320;
+    final bool shouldShow =
+        _scrollController.hasClients && _scrollController.offset > threshold;
+    if (shouldShow != _showSticky) {
+      setState(() => _showSticky = shouldShow);
+    }
   }
 
   Future<void> _loadForDay(DateTime day) async {
@@ -363,7 +384,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     });
   }
 
-  Future<Set<DateTime>> _loadMarkedDaysForMonth(DateTime month) async {
+  Future<Set<DateTime>> _loadMarkedDays() async {
     final List<Task> all = await widget.repository.getAll();
     final Set<DateTime> days = all
         .map(
@@ -373,42 +394,101 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return days;
   }
 
+  Future<void> _openCalendarSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+            child: FutureBuilder<Set<DateTime>>(
+              future: _loadMarkedDays(),
+              builder:
+                  (
+                    BuildContext context,
+                    AsyncSnapshot<Set<DateTime>> snapshot,
+                  ) {
+                    final Set<DateTime> marked = snapshot.data ?? <DateTime>{};
+                    return MonthlyCalendar(
+                      selectedDay: _selectedDay,
+                      markedDays: marked,
+                      onDaySelected: (DateTime day) {
+                        setState(() => _selectedDay = day);
+                        _loadForDay(day);
+                        Navigator.of(context).pop();
+                      },
+                    );
+                  },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  String _stickyDateText() {
+    return DateFormat('EEE, MMM d, y').format(_selectedDay);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Calendar')),
-      body: Column(
+      body: Stack(
         children: <Widget>[
-          FutureBuilder<Set<DateTime>>(
-            future: _loadMarkedDaysForMonth(_selectedDay),
-            builder:
-                (BuildContext context, AsyncSnapshot<Set<DateTime>> snapshot) {
-                  final Set<DateTime> marked = snapshot.data ?? <DateTime>{};
-                  return MonthlyCalendar(
-                    selectedDay: _selectedDay,
-                    markedDays: marked,
-                    onDaySelected: (DateTime day) {
-                      setState(() => _selectedDay = day);
-                      _loadForDay(day);
-                    },
-                  );
-                },
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _tasks.isEmpty
-                ? const Center(child: Text('No tasks on this date'))
-                : ListView.separated(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 8,
-                      horizontal: 12,
-                    ),
-                    itemCount: _tasks.length,
-                    itemBuilder: (BuildContext context, int index) {
-                      final Task task = _tasks[index];
-                      return TaskCard(
+          CustomScrollView(
+            controller: _scrollController,
+            slivers: <Widget>[
+              SliverToBoxAdapter(
+                child: FutureBuilder<Set<DateTime>>(
+                  future: _loadMarkedDays(),
+                  builder:
+                      (
+                        BuildContext context,
+                        AsyncSnapshot<Set<DateTime>> snapshot,
+                      ) {
+                        final Set<DateTime> marked =
+                            snapshot.data ?? <DateTime>{};
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: MonthlyCalendar(
+                            selectedDay: _selectedDay,
+                            markedDays: marked,
+                            onDaySelected: (DateTime day) {
+                              setState(() => _selectedDay = day);
+                              _loadForDay(day);
+                            },
+                          ),
+                        );
+                      },
+                ),
+              ),
+              if (_loading)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_tasks.isEmpty)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(child: Text('No tasks on this date')),
+                )
+              else
+                SliverList.separated(
+                  itemCount: _tasks.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    final Task task = _tasks[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
+                      child: TaskCard(
                         task: task,
                         onEdit: () async {
                           final Task? updated = await Navigator.of(context)
@@ -455,11 +535,45 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             );
                           }
                         },
-                      );
-                    },
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  ),
+                      ),
+                    );
+                  },
+                  separatorBuilder: (_, __) => const SizedBox(height: 4),
+                ),
+            ],
           ),
+          if (_showSticky)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Material(
+                elevation: 2,
+                color: Theme.of(context).colorScheme.surface,
+                child: Container(
+                  height: 56,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    children: <Widget>[
+                      const Icon(Icons.event, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _stickyDateText(),
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Open calendar',
+                        onPressed: _openCalendarSheet,
+                        icon: const Icon(Icons.calendar_month_outlined),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

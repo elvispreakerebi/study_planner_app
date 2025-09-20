@@ -16,7 +16,7 @@ class TaskCard extends StatelessWidget {
 
   String _formatDue(DateTime dt) {
     final DateFormat df = DateFormat('EEE, MMM d • h:mm a');
-    return df.format(dt);
+    return 'Due at ${df.format(dt)}';
   }
 
   void _showDetails(BuildContext context) {
