@@ -1,4 +1,4 @@
-/// Study Planner App entrypoint and app shell.
+// Study Planner App entrypoint and app shell.
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
