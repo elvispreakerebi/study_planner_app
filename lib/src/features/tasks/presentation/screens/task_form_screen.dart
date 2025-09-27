@@ -1,4 +1,6 @@
 /// Task creation and edit screen with custom-styled inputs and single-step date+time picker.
+library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:study_planner_app/src/features/tasks/domain/entities/task.dart';

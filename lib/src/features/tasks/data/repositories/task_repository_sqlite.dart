@@ -1,4 +1,6 @@
 /// TaskRepository implementation backed by SQLite using sqflite.
+library;
+
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 import 'package:study_planner_app/src/features/tasks/domain/entities/task.dart';

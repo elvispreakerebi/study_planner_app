@@ -1,4 +1,6 @@
 /// TaskRepository implementation backed by Shared Preferences (JSON list).
+library;
+
 import 'package:study_planner_app/src/features/tasks/data/datasources/task_local_data_source.dart';
 import 'package:study_planner_app/src/features/tasks/data/models/task_model.dart';
 import 'package:study_planner_app/src/features/tasks/domain/entities/task.dart';

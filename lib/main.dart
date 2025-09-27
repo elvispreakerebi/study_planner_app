@@ -15,6 +15,10 @@ import 'package:study_planner_app/src/features/tasks/domain/repositories/task_re
 import 'package:study_planner_app/src/features/tasks/presentation/screens/task_form_screen.dart';
 import 'package:study_planner_app/src/features/tasks/presentation/widgets/task_card.dart';
 
+void main() {
+  runApp(const StudyPlannerApp());
+}
+
 /// Root widget configuring Material 3 theme and the tab scaffold.
 class StudyPlannerApp extends StatelessWidget {
   const StudyPlannerApp({super.key});
@@ -221,8 +225,9 @@ class _TodayScreenState extends State<TodayScreen> with WidgetsBindingObserver {
       final List<Duration> offsets = <Duration>[];
       if (t.notifyOneHourBefore) offsets.add(const Duration(hours: 1));
       if (t.notifyOneDayBefore) offsets.add(const Duration(days: 1));
-      if (offsets.isEmpty)
+      if (offsets.isEmpty) {
         return DateTime.fromMillisecondsSinceEpoch(1 << 62); // far future
+      }
       final DateTime earliest = offsets
           .map((Duration d) => t.dueDate.subtract(d))
           .reduce((DateTime a, DateTime b) => a.isBefore(b) ? a : b);
